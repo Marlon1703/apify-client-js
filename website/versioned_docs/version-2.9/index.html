@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Locação</title>
+</head>
+<body>
+    <h1>Bem-vindo ao Sistema de Locação</h1>
+    <nav>
+        <a href="/cadastrar_cliente">Cadastrar Cliente</a> |
+        <a href="/listar_clientes">Listar Clientes</a> |
+        <a href="/ordem_servico">Gerar Ordem de Serviço</a>
+    </nav>
+</body>
+</html>
+"""
+
+# Template para cadastrar cliente
+cadastrar_cliente_html = """
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastrar Cliente</title>
+</head>
+<body>
+    <h1>Cadastrar Cliente</h1>
+    <form method="POST">
+        <label for="nome">Nome:</label>
+        <input type="text" id="nome" name="nome" required><br>
+        <label for="email">E-mail:</label>
+        <input type="email" id="email" name="email" required><br>
+        <label for="telefone">Telefone:</label>
+        <input type="text" id="telefone" name="telefone" required><br>
+        <label for="rg">RG:</label>
+        <input type="text" id="rg" name="rg" required><br>
+        <button type="submit">Cadastrar</button>
+    </form>
+</body>
+</html>
+"""
+
+# Template para listar clientes
+listar_clientes_html = """
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Listar Clientes</title>
+</head>
+<body>
+    <h1>Lista de Clientes</h1>
+    <ul>
+        {% for cliente in clientes %}
+            <li>{{ loop.index }} - Nome: {{ cliente['nome'] }}, E-mail: {{ cliente['email'] }}, Telefone: {{ cliente['telefone'] }}, RG: {{ cliente['rg'] }} <a href="/contrato/{{ loop.index0 }}">Gerar Contrato</a></li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
+"""
+
+# Template para contrato
+contrato_html = """
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contrato</title>
+</head>
+<body>
+    <h1>Contrato para {{ cliente['nome'] }}</h1>
+    <form method="POST">
+        <textarea name="contrato_texto" rows="10" cols="50">Este é o contrato para o cliente {{ cliente['nome'] }}</textarea><br>
+        <button type="submit">Salvar Contrato</button>
+    </form>
+</body>
+</html>
+"""
+
+# Template para ordem de serviço
+ordem_servico_html = """
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ordem de Serviço</title>
+</head>
+<body>
+    <h1>Gerar Ordem de Serviço</h1>
+    <form method="POST">
+        <label for="cliente_id">Cliente:</label>
+        <select id="cliente_id" name="cliente_id">
+            {% for cliente in clientes %}
+                <option value="{{ loop.index0 }}">{{ cliente['nome'] }}</option>
+            {% endfor %}
+        </select><br>
+        <label for="itens">Itens Locados:</label>
+        <select id="itens" name="itens" multiple>
+            {% for equipamento in equipamentos %}
+                <option value="{{ equipamento['nome'] }}">{{ equipamento['nome'] }}</option>
+            {% endfor %}
+        </select><br>
+        <label for="dias">Dias:</label>
+        <input type="number" id="dias" name="dias" required><br>
+        <label for="periodo">Período:</label>
+        <select id="periodo" name="periodo">
+            <option value="dia">Dia</option>
+            <option value="semana">Semana</option>
+            <option value="quinzena">Quinzena</option>
+            <option value="mes">Mês</option>
+        </select><br>
+        <button type="submit">Gerar Ordem</button>
+    </form>
+</body>
+</html>
+"""
+
+@app.route('/')
+def index():
+    return render_template_string(index_html)
+
+@app.route('/cadastrar_cliente', methods=['GET', 'POST'])
+def cadastrar_cliente():
+    if request.method == 'POST':
+        nome = request.form['nome']
+        email = request.form['email']
+        telefone = request.form['telefone']
+        rg = request.form['rg']
+
+        cliente = {'nome': nome, 'email': email, 'telefone': telefone, 'rg': rg}
+        clientes.append(cliente)
+        flash('Cliente cadastrado com sucesso!')
+        return redirect(url_for('listar_clientes'))
+
+    return render_template_string(cadastrar_cliente_html)
+
+@app.route('/listar_clientes')
+def listar_clientes():
+    return render_template_string(listar_clientes_html, clientes=clientes)
+
+@app.route('/contrato/<int:cliente_id>', methods=['GET', 'POST'])
+def contrato(cliente_id):
+    cliente = clientes[cliente_id]
+    if request.method == 'POST':
+        contrato_texto = request.form['contrato_texto']
+        contrato = {'cliente': cliente, 'contrato_texto': contrato_texto}
+        contratos.append(contrato)
+        flash('Contrato gerado e salvo com sucesso!')
+        return redirect(url_for('listar_clientes'))
+
+    return render_template_string(contrato_html, cliente=cliente)
+
+@app.route('/ordem_servico', methods=['GET', 'POST'])
+def ordem_servico():
+    if request.method == 'POST':
+        cliente_id = int(request.form['cliente_id'])
+        itens = request.form.getlist('itens')
+        dias = int(request.form['dias'])
+        periodo = request.form['periodo']
+
+        # Cálculo do valor total baseado nos itens e período
+        total = 0
+        for item in itens:
+            equipamento = next(e for e in equipamentos if e['nome'] == item)
+            if periodo == 'dia':
+                total += equipamento['preco_dia'] * dias
+            elif periodo == 'semana':
+                total += equipamento['preco_semana'] * (dias // 7)
+            elif periodo == 'quinzena':
+                total += equipamento['preco_quinzena'] * (dias // 15)
+            elif periodo == 'mes':
+                total += equipamento['preco_mes'] * (dias // 30)
+
+        ordem = {
+            'cliente': clientes[cliente_id],
+            'itens': itens,
+            'total': total,
+            'dias': dias,
+            'periodo': periodo
+        }
+        ordens_servico.append(ordem)
+        flash('Ordem de serviço gerada com sucesso!')
+        return redirect(url_for('index'))
+
+    return render_template_string(ordem_servico_html, equipamentos=equipamentos, clientes=clientes)
+
+if __name__ == '__main__':
+    app.run(debug=True)
